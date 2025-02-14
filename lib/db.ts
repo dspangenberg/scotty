@@ -30,7 +30,7 @@ class MyDatabase extends Dexie {
   feedItems!: Table<FeedItem>
 
   constructor() {
-    super('starter')
+    super('scotty')
     this.version(1).stores({
       feeds: '++id, name, url, category_id, fav_icon',
       categories: '++id, name, pos',

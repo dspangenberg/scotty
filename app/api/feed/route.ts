@@ -1,4 +1,9 @@
-import { type FeedData, extract } from '@extractus/feed-extractor'
+/*
+ * scotty is licensed under the terms of the EUPL-1.2 license
+ * Copyright (c) 2025 by Danny Spangenberg
+ */
+
+import { extract } from '@extractus/feed-extractor'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request): Promise<FeedData> {
@@ -10,9 +15,9 @@ export async function GET(request: Request): Promise<FeedData> {
   }
 
   try {
-    const rss = await extract(url, { limit: 20 })
+    const rss = await extract(url)
 
-    return NextResponse.json(rss.entries) as FeedData
+    return NextResponse.json(rss.entries)
   } catch (error) {
     console.error('Error fetching feed:', error)
     return NextResponse.json(
