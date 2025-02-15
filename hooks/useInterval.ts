@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-
+import { useEffect, useRef, useState } from 'react'
 
 type IntervalOptions = {
-  immediate?: boolean;
-  autoStart?: boolean;
-};
+  immediate?: boolean
+  autoStart?: boolean
+}
 
 type IntervalReturn = {
-  start: () => void;
-  stop: () => void;
-  toggle: () => void;
-  isRunning: boolean;
-};
+  start: () => void
+  stop: () => void
+  toggle: () => void
+  isRunning: boolean
+}
 
 /**
  * Sets up an interval with imperative controls. Returns start/stop methods and running state.
@@ -33,30 +32,30 @@ type IntervalReturn = {
 export function useInterval(
   callback: () => void,
   delay: number | null,
-  options?: IntervalOptions,
+  options?: IntervalOptions
 ): IntervalReturn {
-  const savedCallback = useRef(callback);
-  const { immediate = false, autoStart = true } = options ?? {};
-  const [isRunning, setIsRunning] = useState(autoStart);
+  const savedCallback = useRef(callback)
+  const { immediate = false, autoStart = true } = options ?? {}
+  const [isRunning, setIsRunning] = useState(autoStart)
 
   useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
+    savedCallback.current = callback
+  }, [callback])
 
   useEffect(() => {
-    if (typeof delay !== "number" || !isRunning) return;
+    if (typeof delay !== 'number' || !isRunning) return
     if (immediate) {
-      savedCallback.current();
+      savedCallback.current()
     }
 
-    const tick = () => savedCallback.current();
-    const id = setInterval(tick, delay);
-    return () => clearInterval(id);
-  }, [delay, isRunning, immediate]);
+    const tick = () => savedCallback.current()
+    const id = setInterval(tick, delay)
+    return () => clearInterval(id)
+  }, [delay, isRunning, immediate])
 
-  const start = () => setIsRunning(true);
-  const stop = () => setIsRunning(false);
-  const toggle = () => setIsRunning(!isRunning);
+  const start = () => setIsRunning(true)
+  const stop = () => setIsRunning(false)
+  const toggle = () => setIsRunning(!isRunning)
 
-  return { start, stop, toggle, isRunning };
+  return { start, stop, toggle, isRunning }
 }

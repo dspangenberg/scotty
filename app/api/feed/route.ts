@@ -1,12 +1,15 @@
-/*
- * scotty is licensed under the terms of the EUPL-1.2 license
- * Copyright (c) 2025 by Danny Spangenberg
- */
-
 import { extract } from '@extractus/feed-extractor'
 import { NextResponse } from 'next/server'
 
-export async function GET(request: Request): Promise<FeedData> {
+interface FeedEntry {
+  id: number
+  title?: string
+  link?: string
+  published?: string
+  description?: string
+}
+
+export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url)
   const url = searchParams.get('url')
 
@@ -16,8 +19,31 @@ export async function GET(request: Request): Promise<FeedData> {
 
   try {
     const rss = await extract(url)
+    if (!rss || !rss.entries) {
+      return NextResponse.json({ error: 'Invalid RSS feed' }, { status: 400 })
+    }
 
-    return NextResponse.json(rss.entries)
+    let idCounter = 1 // Counter for generating unique IDs
+
+    const entries: FeedEntry[] = rss.entries.map(entry => {
+      let id: number
+      if (entry.id) {
+        const parsedId = Number.parseInt(entry.id, 10)
+        id = Number.isNaN(parsedId) ? idCounter++ : parsedId
+      } else {
+        id = idCounter++
+      }
+
+      return {
+        id,
+        title: entry.title,
+        link: entry.link,
+        published: entry.published,
+        description: entry.description
+      }
+    })
+
+    return NextResponse.json(entries)
   } catch (error) {
     console.error('Error fetching feed:', error)
     return NextResponse.json(

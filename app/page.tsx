@@ -10,11 +10,85 @@ import { db } from '@/lib/db'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 
+interface FeedWithItems {
+  id: number // Keep this as number, we're ensuring it's always a number in the code
+  name: string
+  url: string
+  category_id: number
+  fav_icon: string
+  items: FeedItem[]
+}
+
+function FeedCard({ feed }: { feed: FeedWithItems }) {
+  const formatRelativeDate = useMemo(
+    () => (dateString: string) => {
+      try {
+        const date = parseISO(dateString)
+        return formatDistanceToNow(date, { addSuffix: true, locale: de })
+      } catch (error) {
+        console.error('Error parsing date:', error)
+        return 'Unknown date'
+      }
+    },
+    []
+  )
+
+  const newestItemDate = useMemo(() => {
+    if (feed.items.length === 0) return null
+    return feed.items.reduce((newest, item) => {
+      const itemDate = new Date(item.pub_date)
+      return itemDate > newest ? itemDate : newest
+    }, new Date(0))
+  }, [feed.items])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <img src={feed.fav_icon} alt={`${feed.name} favicon`} className="rounded-md size-6" />
+          <span>{feed.name}</span>
+        </CardTitle>
+        {newestItemDate && (
+          <CardDescription>{formatRelativeDate(newestItemDate.toISOString())}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2 hyphens-auto">
+          {feed.items.map((item, index) => (
+            <li key={item.id || index} className="flex items-start space-x-2">
+              <Tooltip>
+                <TooltipTrigger className="flex w-full items-center space-x-2">
+                  <div className="flex-1 max-w-full">
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline cursor-pointer text-left block text-sm truncate"
+                    >
+                      {item.title}
+                    </a>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent align="start">
+                  <div className="p-4 max-w-sm">
+                    <h1 className="font-medium text-base leading-tight">{item.title}</h1>
+                    <p className="text-sm pt-1.5 hyphens-auto">{item.description}</p>
+                    <p className="text-xs pt-1">{formatRelativeDate(item.pub_date)}</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Home() {
-  const [rss, updateRss] = useState<(FeedItem & { feed: { name: string; fav_icon: string } })[]>([])
+  const [feeds, setFeeds] = useState<FeedWithItems[]>([])
   const fetchRssFeed = useFetchRssFeed()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null)
@@ -31,54 +105,28 @@ export default function Home() {
     fetchRssFeed()
     setLastRefreshTime(new Date())
   }, 120000)
-  const items = useLiveQuery(async () => {
-    // Get all feeds
+
+  useLiveQuery(async () => {
     const feeds = await db.feeds.toArray()
-
-    // Get the latest 5 items from each feed
-    const feedItemsPromises = feeds.map(async feed => {
-      if (feed.id === undefined) return []
-
-      const items = await db.feedItems.where('feed_id').equals(feed.id).reverse().sortBy('pub_date')
-
-      return items.slice(0, 5).map((item: FeedItem) => ({
-        ...item,
-        feed: {
+    const feedsWithItems: FeedWithItems[] = await Promise.all(
+      feeds.map(async (feed): Promise<FeedWithItems> => {
+        const items = await db.feedItems
+          .where('feed_id')
+          .equals(feed.id ?? 0)
+          .reverse()
+          .sortBy('pub_date')
+        return {
+          id: feed.id as number,
           name: feed.name,
-          fav_icon: feed.fav_icon
+          url: feed.url,
+          category_id: feed.category_id,
+          fav_icon: feed.fav_icon,
+          items: items.slice(0, 6)
         }
-      }))
-    })
-
-    const allFeedItems = await Promise.all(feedItemsPromises)
-
-    // Flatten the array of arrays and sort by pub_date
-    const sortedItems = allFeedItems
-      .flat()
-      .sort((a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime())
-
-    // Return the 20 most recent items
-    return sortedItems.slice(0, 20)
-  })
-
-  useEffect(() => {
-    if (items) {
-      updateRss(items)
-    }
-  }, [items])
-
-  const formatRelativeDate = useMemo(
-    () => (dateString: string) => {
-      try {
-        const date = parseISO(dateString)
-        return formatDistanceToNow(date, { addSuffix: true, locale: de })
-      } catch (error) {
-        console.error('Error parsing date:', error)
-        return 'Unknown date'
-      }
-    },
-    []
-  )
+      })
+    )
+    setFeeds(feedsWithItems)
+  }, [])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -88,68 +136,25 @@ export default function Home() {
   }
 
   return (
-    <div className="grid h-screen mt-24 grid-rows-[20px_1fr_20px] min-h-screen p-8 gap-16 ">
-      <Card className="">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Latest News</CardTitle>
-            <CardDescription>From Multiple RSS Feeds</CardDescription>
-            {lastRefreshTime && (
-              <p className="text-sm text-gray-500 mt-1">
-                Last refreshed: {format(lastRefreshTime, 'HH:mm:ss')}
-              </p>
-            )}
-          </div>
-          <Button onClick={handleRefresh} disabled={isRefreshing}>
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <ul className="max-w-md space-y-1 hyphens-auto">
-            {rss.map((entry, index) => (
-              <li key={entry.id || index} className="flex items-start space-x-2">
-                <Tooltip>
-                  {entry.feed.fav_icon && (
-                    <div className="flex-shrink-0 w-4 h-4 mt-1 relative">
-                      <Image
-                        src={entry.feed.fav_icon}
-                        alt={`${entry.feed.name} favicon`}
-                        layout="fill"
-                        objectFit="contain"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-grow min-w-0">
-                    <TooltipTrigger>
-                      <h1 className="font-medium text-base">
-                        <a
-                          href={entry.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline cursor-pointer block truncate"
-                        >
-                          {entry.title}
-                        </a>
-                      </h1>
-                    </TooltipTrigger>
-                    <TooltipContent align="start">
-                      <div className="p-4 max-w-sm">
-                        <h1 className="font-medium text-base">{entry.title}</h1>
-                        <p className="text-xs pt-0.5 hyphens-auto line-clamp-2">
-                          {entry.description}
-                        </p>
-                        <p className="text-xs mt-1">
-                          {entry.feed.name} - {formatRelativeDate(entry.pub_date)}
-                        </p>
-                      </div>
-                    </TooltipContent>
-                  </div>
-                </Tooltip>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto mt-24 p-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold">RSS Feeds</h1>
+          {lastRefreshTime && (
+            <p className="text-sm text-gray-500 mt-1">
+              Last refreshed: {format(lastRefreshTime, 'HH:mm:ss')}
+            </p>
+          )}
+        </div>
+        <Button onClick={handleRefresh} disabled={isRefreshing}>
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {feeds.map(feed => (
+          <FeedCard key={feed.id} feed={feed} />
+        ))}
+      </div>
     </div>
   )
 }

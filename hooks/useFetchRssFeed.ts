@@ -5,7 +5,7 @@ import { useManageFeeds } from './useManageFeeds'
 export function useFetchRssFeed() {
   const { addFeedIfNotExists } = useManageFeeds()
 
-  const fetchRssFeed = useCallback(async () => {
+  return useCallback(async () => {
     try {
       // Fetch all feeds from the database
       await addFeedIfNotExists({
@@ -50,7 +50,7 @@ export function useFetchRssFeed() {
           if (!existingEntry) {
             newItems++
             await db.feedItems.add({
-              feed_id: feed.id,
+              feed_id: feed.id || 0,
               org_id: item.id || '',
               title: item.title || '',
               link: item.link || '',
@@ -65,6 +65,4 @@ export function useFetchRssFeed() {
       console.error('Error fetching RSS feeds:', error)
     }
   }, [addFeedIfNotExists])
-
-  return fetchRssFeed
 }
