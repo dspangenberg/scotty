@@ -29,6 +29,13 @@ export function useFetchRssFeed() {
         fav_icon: 'https://www.sueddeutsche.de/szde-assets/img/favicon-32x32.png'
       })
 
+      await addFeedIfNotExists({
+        name: 'General Anzeiger Bonn',
+        url: 'https://ga.de/feed.rss',
+        category_id: 2,
+        fav_icon: 'https://ga.de/assets/skins/general-anzeiger-bonn/favicon.ico?v=1738741052'
+      })
+
       const feeds = await db.feeds.toArray()
 
       for (const feed of feeds) {
