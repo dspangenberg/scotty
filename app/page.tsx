@@ -1,7 +1,20 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent
+} from '@/components/ui/chart'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { FeedItem } from '@/hooks/useFeeds'
 import { useFetchRssFeed } from '@/hooks/useFetchRssFeed'
@@ -10,8 +23,10 @@ import { db } from '@/lib/db'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useState } from 'react'
+import { TrendingUp } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts'
 interface FeedWithItems {
   id: number // Keep this as number, we're ensuring it's always a number in the code
   name: string
@@ -19,6 +34,84 @@ interface FeedWithItems {
   category_id: number
   fav_icon: string
   items: FeedItem[]
+}
+
+export interface WakaTimeDaily {
+  date: string
+  decimal: number
+  digital: string
+}
+
+const chartData = [
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
+]
+const chartConfig = {
+  desktop: {
+    label: 'Desktop',
+    color: 'hsl(var(--chart-1))'
+  },
+  mobile: {
+    label: 'Mobile',
+    color: 'hsl(var(--chart-2))'
+  },
+  label: {
+    color: 'hsl(var(--background))'
+  }
+} satisfies ChartConfig
+
+function Chart({ data }: { data: WakaTimeDaily[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Wakatime-Zeiten</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={chartConfig}>
+          <BarChart
+            accessibilityLayer
+            data={data}
+            margin={{
+              top: 10,
+              right: 20,
+              left: 20,
+              bottom: 10
+            }}
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
+            <Bar dataKey="decimal" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]}>
+              <LabelList
+                dataKey="digital"
+                position="top"
+                offset={10}
+                fill="hsl(var(--foreground))"
+                fontSize={12}
+              />
+            </Bar>
+            <ChartTooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload as WakaTimeDaily
+                  return (
+                    <ChartTooltipContent>
+                      <div className="font-bold">{data.date}</div>
+                      <div>{data.digital}</div>
+                    </ChartTooltipContent>
+                  )
+                }
+                return null
+              }}
+            />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
 }
 
 function FeedCard({ feed }: { feed: FeedWithItems }) {
@@ -92,6 +185,20 @@ export default function Home() {
   const fetchRssFeed = useFetchRssFeed()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null)
+  const [wakaTimeData, setWakaTimeData] = useState<WakaTimeDaily[]>([])
+
+  const fetchWakaTimeData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/wakatime')
+      if (!response.ok) {
+        throw new Error('Failed to fetch WakaTime data')
+      }
+      const data = await response.json()
+      setWakaTimeData(data.daily)
+    } catch (error) {
+      console.error('Error fetching WakaTime data:', error)
+    }
+  }, [])
 
   useEffect(() => {
     const fetchAndUpdateTime = async () => {
@@ -99,7 +206,8 @@ export default function Home() {
       setLastRefreshTime(new Date())
     }
     fetchAndUpdateTime()
-  }, [fetchRssFeed])
+    fetchWakaTimeData()
+  }, [fetchRssFeed, fetchWakaTimeData])
 
   useInterval(() => {
     fetchRssFeed()
@@ -150,10 +258,17 @@ export default function Home() {
           {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {feeds.map(feed => (
-          <FeedCard key={feed.id} feed={feed} />
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-8 ">
+            {feeds.map(feed => (
+              <FeedCard key={feed.id} feed={feed} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <Chart data={wakaTimeData} />
+        </div>
       </div>
     </div>
   )
