@@ -30,6 +30,13 @@ export function useFetchRssFeed() {
       })
 
       await addFeedIfNotExists({
+        name: 'T-Online.de',
+        url: 'https://www.t-online.de/feed.rss',
+        category_id: 1,
+        fav_icon: 'https://www.t-online.de/favicon.ico'
+      })
+
+      await addFeedIfNotExists({
         name: 'General Anzeiger Bonn',
         url: 'https://ga.de/feed.rss',
         category_id: 2,
