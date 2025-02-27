@@ -43,6 +43,13 @@ export function useFetchRssFeed() {
         fav_icon: 'https://ga.de/assets/skins/general-anzeiger-bonn/favicon.ico?v=1738741052'
       })
 
+      await addFeedIfNotExists({
+        name: 'Der Standard',
+        url: 'https://www.derstandard.at/rss',
+        category_id: 1,
+        fav_icon: 'https://at.staticfiles.at/img/appicons/favicon-9af6cbb9a6.ico'
+      })
+
       const feeds = await db.feeds.toArray()
 
       for (const feed of feeds) {
